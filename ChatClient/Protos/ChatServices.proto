@@ -1,0 +1,74 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "ChatClient";
+
+service ChatServerService {
+  rpc Register (ChatClientRegisterRequest) returns (ChatClientRegisterReply);
+  rpc Login (LoginRequest) returns (LoginReply);
+  rpc Logout (LogOutRequest) returns (LogOutReply);
+  rpc SendMessage (SendMessageRequest) returns (SendMessageReply);
+  rpc ReceiveMessages (ReceiveMessageRequest) returns (ReceiveMessageReply);
+  rpc GetUsers (GetUsersRequest) returns (GetUsersReply);
+}
+
+message ReceiveMessageReply {
+	repeated Message  messages = 1;
+}
+message ReceiveMessageRequest {
+	User user = 1;
+	string url = 2;
+}
+message SendMessageRequest {
+	User user = 1;
+	Message message = 2;
+	string url = 3;
+}
+message SendMessageReply {
+	MessageStatus status = 1;
+}
+message GetUsersReply {
+	repeated User users = 8;
+}
+message GetUsersRequest {
+	User user = 1;
+	string url = 2;
+}
+message ChatClientRegisterRequest {
+  User user = 1;
+  string password = 2;
+}
+message ChatClientRegisterReply {
+	bool ok = 1;
+	User user = 2;
+}
+message LoginRequest {
+	User user = 1;
+	string password = 2;
+	string url = 3;
+}
+message LoginReply {
+	bool ok = 1;
+}
+message LogOutRequest {
+	User user = 1;
+	string url = 2;
+}
+message LogOutReply {
+	bool ok = 1;
+}
+message User {
+	string name = 1;
+	int32 id = 2;
+}
+
+message Message{
+	User receiver = 1;
+	User sender = 2;
+	string messageBody = 3;
+	string timestamp = 4;
+}
+
+enum MessageStatus {
+	MESSAGE_SENT = 0;
+	MESSAGE_FAILED = 1;
+}
