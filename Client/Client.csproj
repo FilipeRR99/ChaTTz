@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\ChatServices.proto" GrpcServices="Client" />
+	<Protobuf Include="Protos\PuppetClient.proto" GrpcServices="Both" />
   </ItemGroup>
 
 </Project>

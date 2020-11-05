@@ -1,0 +1,41 @@
+syntax = "proto3";
+option csharp_namespace = "Clients";
+
+service PuppetClientService {
+	rpc GetClientStatus (GetClientStatusRequest) returns (GetClientStatusReply);
+	rpc SendMappings (SendMappingsRequest) returns (SendMappingsReply);
+}
+
+message SendMappingsRequest {
+	string replicationFactor = 1; 
+	repeated ServerMapping serverMapping = 2;
+	repeated ClientMapping clientMapping = 3;
+	repeated PartitionMapping partitionMapping = 4;
+}
+
+message SendMappingsReply {
+	bool ok = 1;
+}
+
+message GetClientStatusRequest {
+}	
+
+message GetClientStatusReply {
+	bool ok = 1;
+	string response = 2;
+}
+
+message ServerMapping {
+	string serverId = 1;
+	string url = 2;
+}
+
+message ClientMapping {
+	string username = 1;
+	string url = 2;
+}
+
+message PartitionMapping {
+	string partitionId = 1;
+	repeated string serverId = 2;
+}

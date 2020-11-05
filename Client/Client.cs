@@ -5,70 +5,70 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Drawing;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
-using System.Windows.Forms;
-using System.Windows.Forms.Design;
 using Grpc.Core;
 using Grpc.Net.Client;
+using System.Threading.Tasks;
 
 
 namespace Clients
 {
 
-    public partial class Client 
+    public partial class Client
     {
         private ServerService.ServerServiceClient client;
-        static string serverPort="10001";
-        string defaultServer = "http://localhost:"+serverPort;
+
+        static string serverPort = "10001";
+        string defaultServer = "http://localhost:" + serverPort;
         GrpcChannel channel;
+        string username;
         int myPort;
         string myURL;
         String[] lines;
-        private int server_id;
         // ServerList = <serverId, URL>
-        public Dictionary<int, string> ServerList = new Dictionary<int, string>();
-        // DataCenter = <partionId, List<serverId>>
-        public Dictionary<int, List<int>> DataCenter =new Dictionary<int, List<int>>();
-
-        //primeiro master,ligo-te ao master da partition id
-        public Client(String input_file)
+        public Dictionary<string, string> ServerList = new Dictionary<string, string>();
+        // DataCenter = <partitionId, List<serverId>>
+        public Dictionary<string, List<string>> DataCenter = new Dictionary<string, List<string>>();
+        //ClientList= <username,URL>
+        public Dictionary<string, string> ClientList = new Dictionary<string, string>();
+        public Client(String client_username,String client_URL, String script_file)
         {
 
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
             openChannel(defaultServer);
-            Random rnd = new Random();
-            // myPort = rnd.Next(5000, 50000);
-            myPort = 1000;
-            myURL = "http://localhost:" + myPort.ToString();
-            string aux = @"{0}.txt";
-            string path = aux.Replace("{0}", input_file);
-            lines = System.IO.File.ReadAllLines("input_file.txt");
-            server_id = getServerId();
-            Dictionary<int, List<int>> tmp = new Dictionary<int, List<int>>();
-            List<int> tmpA = new List<int>();
-            List<int> tmpB = new List<int>();
-            tmpA.Add(1);
-            tmpB.Add(3);
-            tmpA.Add(3);
-            tmpB.Add(1);
-            tmp.Add(1, tmpA);
-            tmp.Add(2, tmpB);
 
-            Dictionary<int, string> tmp2 = new Dictionary<int, string>();
-            tmp2.Add(1, "http://localhost:10001");
-            tmp2.Add(3, "http://localhost:10003");
-            this.ServerList = tmp2;
+            username = client_username;
+            myURL = "client_URL";
+            lines = System.IO.File.ReadAllLines(script_file);
+
+
+            //temporary fill
+
+
+            Dictionary<string, List<string>> tmp = new Dictionary<string, List<string>>();
+            List<string> tmpA = new List<string>();
+            List<string> tmpB = new List<string>();
+            tmpA.Add("Server-1");
+            tmpA.Add("Server-3");
+            tmpB.Add("Server-3");
+            tmpB.Add("Server-1");
+            tmp.Add("Part1", tmpA);
+            tmp.Add("Part2", tmpB);
             this.DataCenter = tmp;
+
+            Dictionary<string, string> tmp2 = new Dictionary<string, string>();
+            tmp2.Add("Server-1", "http://localhost:10001");
+            tmp2.Add("Server-3", "http://localhost:10003");
+            this.ServerList = tmp2;
         }
 
-        public int getServerId()
+        public string getServerId()
         {
-            int id=0;
-            foreach(int key in ServerList.Keys)
+            string id = "";
+            foreach (string key in ServerList.Keys)
             {
-                if (ServerList[key] == defaultServer)
+
+                if (ServerList[key].Equals(defaultServer))
                 {
                     id = key;
                 }
@@ -78,13 +78,14 @@ namespace Clients
 
 
         public void openChannel(string URL)
-        {   
+        {
             this.channel = GrpcChannel.ForAddress(URL);
             this.client = new ServerService.ServerServiceClient(this.channel);
-            
+
+
         }
 
-        public void inputFile(string input_file)
+        public void parseInputFile()
 
         {
             String[] line = new String[lines.Length];
@@ -94,67 +95,78 @@ namespace Clients
             {
                 line = lines[i].Split(' ');
 
-                if (line[0]=="begin-repeat")
+                if (line[0] == "begin-repeat")
                 {
-                    count=beginRepeat(i, int.Parse(line[1]));
+                    count = beginRepeat(i, int.Parse(line[1]));
                     i = i + count;
-                    
+                    Console.WriteLine("end-repeat");
+
                 }
-                else { switchCase(line); }
-                
-                 /*
-                array[i] = new Thread(() => switchCase(line, i));
-                array[i].Start();
-                */
+                else { switchCase(line, -1); }
+
+                /*
+               array[i] = new Thread(() => switchCase(line, i));
+               array[i].Start();
+               */
             }
 
         }
 
-        public void  switchCase(string[] line)
+        public void switchCase(string[] line, int beginRepeat)
         {
-             Console.WriteLine(line[0]);
+
             switch (line[0])
-                {
-                    case "read":
-                        Read(int.Parse(line[1]), int.Parse(line[2]), int.Parse(line[3]));
-                        break;
-                    case "write":
-                        Write(int.Parse(line[1]), int.Parse(line[2]), line[3]);
-                        break;
-                    case "listServer":
-                        ListServer(int.Parse(line[1]));
-                        break;
-                    case "listGlobal":
-                        ListGlobal();
-                        break;
-                    case "wait":
-                        ListServer(int.Parse(line[1]));
-                        break;
-                    
+            {
+                case "read":
+                    Read(line[1], line[2], line[3], beginRepeat);
+                    break;
+                case "write":
+                    CheckMaster(line[1], line[2], line[3], beginRepeat);
+                    break;
+                case "listServer":
+                    ListServer(line[1], beginRepeat);
+                    break;
+                case "listGlobal":
+                    ListGlobal(beginRepeat);
+                    break;
+                case "wait":
+                    Wait(int.Parse(line[1]));
+                    break;
 
-                
+
+
             }
         }
-        public ReadResponse Read(int partitionId, int objectId, int server_id)
+
+        public string CheckReplace(string s, int n)
         {
-            
+            if (s.Contains("$i"))
+            {
+                s = s.Replace("$i", n.ToString());
+            }
+            return s;
+        }
+        public ReadResponse Read(string partitionId, string objectId, string server_id, int beginRepeat)
+        {
+
+
             UniqueKey uniqueKey = new UniqueKey();
             uniqueKey.PartitionId = partitionId;
             uniqueKey.ObjectId = objectId;
-            
+
 
             ReadResponse response = client.Read(new ReadRequest
             {
                 UniqueKey = uniqueKey,
                 ServerId = server_id
             });
-            
-            if (response.Value.Equals("N/A") && server_id != -1)
-                {
+
+            if (response.Value.Equals("N/A") && int.Parse(server_id) != -1)
+            {
                 Console.WriteLine("Current Server doesn't have the object.Changing Server ...");
-                int port = server_id + 10000;
+                int port = int.Parse(server_id) + 10000;
                 var change_server = defaultServer.Replace(serverPort, port.ToString());
-               openChannel(change_server);
+                openChannel(change_server);
                 Console.WriteLine(change_server);
                 response = client.Read(new ReadRequest
                 {
@@ -162,16 +174,37 @@ namespace Clients
                     ServerId = server_id
                 });
                 Console.WriteLine("Response from the new server:");
-                Console.WriteLine(response);
             }
+            if (beginRepeat != -1)
+            {
+                response.Value = CheckReplace(response.Value, beginRepeat);
 
+            }
             Console.WriteLine(response);
 
             return response;
         }
 
-        public WriteResponse Write(int partitionId, int objectId, string value)
+        
+        public void CheckMaster(string partitionId, string objectId, string value, int beginRepeat)
         {
+            string server_id = getServerId();
+            if (!DataCenter[partitionId][0].Equals(server_id))
+            {
+                openChannel(ServerList[server_id]);
+            }
+            Write(partitionId, objectId, value, beginRepeat);
+
+        }
+        public WriteResponse Write(string partitionId, string objectId, string value, int beginRepeat)
+        {
+            if (beginRepeat != -1)
+            {
+                partitionId = CheckReplace(partitionId, beginRepeat);
+                objectId = CheckReplace(objectId, beginRepeat);
+                value = CheckReplace(value, beginRepeat);
+
+            }
             UniqueKey uniqueKey = new UniqueKey();
             uniqueKey.PartitionId = partitionId;
             uniqueKey.ObjectId = objectId;
@@ -185,17 +218,26 @@ namespace Clients
                 Object = o
 
             });
-            Console.WriteLine(response.Ok);
+            if (response.Ok)
+            {
+                Console.WriteLine("Write completed!");
+            }
+            else
+            {
+                Console.WriteLine("Error in write");
+            }
+
             return response;
 
         }
-        public void ListServer(int server_id)
+        public void ListServer(string server_id, int beginRepeat)
         {
 
             ListServerResponse response = client.ListServer(new ListServerRequest
             {
                 ServerId = server_id
             });
+
             foreach (ListServerObj server in response.ListServerObj)
             {
                 string output = $" partitionId {server.Object.UniqueKey.PartitionId} " +
@@ -206,11 +248,15 @@ namespace Clients
                     output += $" Master replica for this object";
                 }
 
+                if (beginRepeat != -1)
+                {
+                    output = CheckReplace(output, beginRepeat);
 
+                }
                 Console.WriteLine(output);
             }
         }
-        public void ListGlobal()
+        public void ListGlobal(int beginRepeat)
         {
 
             ListGlobalResponse response = client.ListGlobal(new ListGlobalRequest { });
@@ -220,57 +266,55 @@ namespace Clients
                 string output = $" partitionId {server.PartitionId} " +
                                 $"objectId {server.ObjectId} ";
 
+                if (beginRepeat != -1)
+                {
+                    if (output.Contains("$i"))
+                    {
+                        output = CheckReplace(output, beginRepeat);
+                    }
+                }
                 Console.WriteLine(output);
             }
         }
-        public void wait(int x)
+        public void Wait(int x)
         {
-
-            WaitResponse response = client.Wait(new WaitRequest
-            {
-                X = x
-            });
             Thread.Sleep(x);
 
         }
 
         public int beginRepeat(int i, int x)
         {
-            Console.WriteLine(lines[i].Split(' ')[0]+ " " + lines[i].Split(' ')[1]);
+            Console.WriteLine(lines[i].Split(' ')[0] + " " + lines[i].Split(' ')[1]);
             int count = 0;
-            
-            //falta verificação duplo begin repeat
-            while (!lines[i].Split(' ')[0].Equals("end-repeat") && lines[i].Split(' ')[0].Equals("begin-repeat"))
-            {   
-                
-                for (int l = 0; l < x; l++)
+            int aux = i;
+            int run = 1;
+
+            while (!lines[i].Split(' ')[0].Equals("end-repeat"))
+            {
+                if (lines[i + 1].Split(' ')[0].Equals("begin-repeat"))
                 {
-                    switchCase(lines[i+1].Split(' '));
+                    run = 0;
                 }
+
                 i = i + 1;
                 count = count + 1;
             }
+            int max = aux + count - 1;
+
+            if (run == 1)
+            {
+                while (aux < max)
+                {
+                    for (int l = 0; l < x; l++)
+                    {
+                        switchCase(lines[aux + 1].Split(' '), l);
+                    }
+                    aux = aux + 1;
+                }
+            }
+
             return count;
         }
-        /*
-        public List<string> Register(string nick, string port)
-        {
-            this.nick = nick;
-           
-            ChatClientRegisterReply reply = client.Register(new ChatClientRegisterRequest
-            {
-                Nick = nick,
-                Url = "http://localhost:" + port
-            });
-
-            List<string> result = new List<string>();
-            foreach (User u in reply.Users)
-            {
-                result.Add(u.Nick);
-            }
-            return result;
-        }*/
-
         static class Program
         {
             /// <summary>
@@ -279,62 +323,45 @@ namespace Clients
             [STAThread]
             static void Main(string[] args)
             {
-                Client client = new Client("input_file");
-                //client.lines = System.IO.File.ReadAllLines("input_file.txt");
-                client.inputFile("input_file.txt");
-                //client.Register("nknsd", "1000");
+                /*To be implemented
+                ServerPort serverPort = new ServerPort("localhost", 10001, ServerCredentials.Insecure);
+                
+                 const string hostname = "localhost";
+                 Server server = new Server
+                {
+                    Services = { PuppetClientService.BindService(new PuppetClient()) },
+                    Ports = { forPort(serverPort) }
+                };
+
+                server.Start()
+                */
+
+                string username = "username";
+                string URL = "http://localhost:1000";
+                string script = "script_file.txt";
+               
+                //run by the command line
+                if (args.Length != 0)
+                {
+                    username = args[0];
+                    URL = args[1];
+                    script = args[2];
+                }
+
+                Client client = new Client(username,URL,script);
+                /*
+                client.DataCenter = puppetClient.getDataCenter();
+                client.ClientList = puppetClient.getClientList();
+                client.ServerList = puppetClient.getServerList();
+                server.ShutdownAsync().Wait();
+                */
+
+                client.parseInputFile();
                 while (true) ;
+                
             }
         }
     }
-
-
-    /*
-    public ChatClientRegisterReply Register(string username, string password)
-    {
-        CurrentUser.Name = username;
-
-        var reply = Client.Register(
-        new ChatClientRegisterRequest { User = CurrentUser, Password = password });
-
-        if (reply.Ok) CurrentUser = reply.User;
-
-        return reply;
-    }
-}*/
-    /*
-    public class ChatClientService : ClientService.ClientServiceBase
-    {
-        ClientService clientLogic;
-
-        public ClientService(IClientService clientLogic)
-        {
-            this.clientLogic = clientLogic;
-        }
-
-        //public override Task<RecvMsgReply> RecvMsg(
-        //    RecvMsgRequest request, ServerCallContext context)
-        //{
-        //   return Task.FromResult(UpdateGUIwithMsg(request));
-        //}
-        /*
-        public RecvMsgReply UpdateGUIwithMsg(RecvMsgRequest request)
-        {
-            if (clientLogic.AddMsgtoGUI(request.Msg))
-            {
-                return new RecvMsgReply
-                {
-                    Ok = true
-                };
-            }
-            else
-            {
-                return new RecvMsgReply
-                {
-                    Ok = false
-                };
-
-            }
-        }
-    }*/
 }
+
+    

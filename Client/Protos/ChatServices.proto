@@ -23,17 +23,12 @@ service ServerService {
 	rpc Wait (WaitRequest) returns (WaitResponse);
 	rpc BeginRepeat (BeginRepeatRequest) returns (BeginRepeatResponse);
 	rpc EndRepeat (EndRepeatRequest) returns (EndRepeatResponse);
-	rpc Register (ChatClientRegisterRequest) returns (ChatClientRegisterReply);
-}
-
-message ListServerObj{
-    Object object = 1;
-    bool isMaster = 2;
+	
 }
 
 message UniqueKey{
-	int32 partitionId = 1;
-	int32 objectId = 2;
+	string partitionId = 1;
+	string objectId = 2;
 }
 
 message Object{
@@ -41,29 +36,41 @@ message Object{
 	string value = 2;
 }
 
-message WriteResponse{
-	bool ok = 1; 
-}
-
 message WriteRequest{
 	Object object = 1;
 }
 
+message WriteResponse{
+	bool ok = 1; 
+}
+
 message ReadRequest{
 	UniqueKey uniqueKey = 1;
-	int32 server_id = 2;
+	string server_id = 2;
 }
 
 message ReadResponse{
 	string value = 1;
 }
 
+message ListServerObj{
+	Object object = 1;
+	bool isMaster = 2;
+}
+
 message ListServerRequest{
-	int32 server_id = 1;
+	string server_id = 1;
 }
 
 message ListServerResponse{
-	repeated ListServerObj listServerObj = 1;
+	repeated ListServerObj listServerObj = 1;	
+}
+
+message ListEachGlobalRequest{
+	string server_id = 1;
+}
+message ListEachGlobalResponse{
+	repeated UniqueKey uniqueKeyList = 1;
 }
 
 message ListGlobalRequest{
@@ -96,15 +103,4 @@ message EndRepeatRequest{
 
 message EndRepeatResponse{
 	string endRepeat = 1;
-}
-
-message ChatClientRegisterRequest {
-  string nick = 1;
-  string url = 2;	
-}
-message ChatClientRegisterReply {
-	repeated User users = 1;
-}
-message User {
-   string nick = 1;
 }
